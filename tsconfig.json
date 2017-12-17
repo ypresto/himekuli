@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "strictNullChecks": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2015",
+    "jsx": "react",
+    "lib": [
+      "dom",
+      "es5",
+      "es2015.promise"
+    ],
+    "sourceMap": true,
+    "pretty": true
+  },
+  "compileOnSave": false
+}
