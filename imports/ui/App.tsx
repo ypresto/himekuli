@@ -131,7 +131,7 @@ class JournalCard extends React.Component<JournalCardProps, JournalCardState> {
     const { journal, isSelf, isToday } = this.props
     const { isInEdit, bodyInEdit, isInConfirmDelete } = this.state
     const canEdit = isSelf && isToday
-    const user = journal.user
+    const user = journal.user!
     // Enforce to show last line break.
     const body = (bodyInEdit ? bodyInEdit : journal.body).replace(/\n$/, "\n ")
     // Prevent from re-forcus just after blur.
@@ -272,6 +272,7 @@ export default class App extends React.Component<{}, {}> {
   render() {
     const JournalGridContainer = withTracker<JournalGridProps, {}>(() => {
       const journals = lodash(Journals.find().fetch())
+        .filter(journal => journal.user)
         .groupBy(journal => journal.userId)
         .map((journals, _) => lodash.maxBy(journals, journal => journal.date)!)
         .value()

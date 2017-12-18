@@ -5,7 +5,7 @@ type User = Meteor.User
 
 export interface Journal {
   _id: string
-  user: User
+  user?: User
   userId: string
   date: string // ISO8601
   body: string
@@ -33,8 +33,8 @@ class JournalCollection extends Mongo.Collection<Journal> {
 }
 
 export const Journals = new JournalCollection('journals', {
-  transform: (journal: any): Journal => {
-    journal.user = Meteor.users.findOne(journal.userId)
+  transform: (journal: Journal): Journal => {
+    journal.user = Meteor.users.findOne(journal.userId) as User | undefined
     return journal as Journal
   }
 });
