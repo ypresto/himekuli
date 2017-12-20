@@ -18,13 +18,14 @@ import {
 } from "rmwc";
 import * as lodash from "lodash"
 import * as moment from "moment"
-import * as Gravatar from "react-gravatar"
 import Linkify from "react-linkify"
 import { Meteor } from 'meteor/meteor';
 import { withTracker } from "meteor/react-meteor-data";
 import Blaze from "meteor/gadicc:blaze-react-component"
+import * as _ from "lodash"
 
 import { Journals, Journal } from "../api/journals"
+import { Avatars, Avatar } from "../api/avatars"
 import {
   CAPTION_TEXT_COLOR,
   FLAT_LIGHT_BUTTON_DISABLED_TEXT_COLOR,
@@ -39,12 +40,12 @@ const DATE_FORMAT = "YYYY/MM/DD"
 const GREY50 = "#F5F5F5"
 
 
-const JournalCardPrimary = (props: { user: User, dateLabel: string, isHistory?: boolean, canEdit?: boolean, onEditClick?(): void }) => {
+const JournalCardPrimary = (props: { user: User, avatarUrl: string, dateLabel: string, isHistory?: boolean, canEdit?: boolean, onEditClick?(): void }) => {
   const user = props.user
   const iconStyle: React.CSSProperties = { position: "absolute", width: 40, height: 40, borderRadius: 50 }
   return (
     <CardPrimary style={{ position: "relative", minHeight: "calc(40px + 16px*2)" }}>
-      <Gravatar style={iconStyle} email={user.services.google.email} />
+      <img style={iconStyle} src={props.avatarUrl} />
       <div style={{ marginLeft: 56 }}>
         <CardTitle>{user.username || user.profile && user.profile.name || '(noname)'}</CardTitle>
         <Typography use="caption" style={{ color: CAPTION_TEXT_COLOR, position: "relative" }}>
@@ -70,9 +71,9 @@ const JournalCardPrimary = (props: { user: User, dateLabel: string, isHistory?: 
   )
 }
 
-const CreateJournalCard = (props: { currentUser: User, currentDate: string, onClickWrite: () => void }) => (
+const CreateJournalCard = (props: { currentUser: User, currentDate: string, avatarUrl: string, onClickWrite: () => void }) => (
   <Card style={{ background: GREY50 }}>
-    <JournalCardPrimary user={props.currentUser} dateLabel="No journals written yet" />
+    <JournalCardPrimary user={props.currentUser} avatarUrl={props.avatarUrl} dateLabel="No journals written yet" />
     <CardSupportingText>
       <div className="hk-editable-as-is">
         <pre style={{ color: CAPTION_TEXT_COLOR }}>Your the first journal will be here..!</pre>
@@ -86,7 +87,7 @@ const CreateJournalCard = (props: { currentUser: User, currentDate: string, onCl
 
 let editOnNextConstruction = false
 
-type JournalCardProps = { journal: Journal, isSelf: boolean, isToday: boolean, onClickWrite(): void }
+type JournalCardProps = { journal: Journal, avatarUrl: string, isSelf: boolean, isToday: boolean, onClickWrite(): void }
 type JournalCardState = { isInEdit: boolean, bodyInEdit?: string, isInConfirmDelete: boolean }
 
 class JournalCard extends React.Component<JournalCardProps, JournalCardState> {
@@ -128,7 +129,7 @@ class JournalCard extends React.Component<JournalCardProps, JournalCardState> {
   throttledSave = lodash.throttle(() => this.save(), 1000)
 
   render() {
-    const { journal, isSelf, isToday } = this.props
+    const { journal, avatarUrl, isSelf, isToday } = this.props
     const { isInEdit, bodyInEdit, isInConfirmDelete } = this.state
     const canEdit = isSelf && isToday
     const user = journal.user!
@@ -140,6 +141,7 @@ class JournalCard extends React.Component<JournalCardProps, JournalCardState> {
       <Card style={{ background: isToday ? null : GREY50 }}>
         <JournalCardPrimary
           user={user}
+          avatarUrl={avatarUrl}
           dateLabel={moment(journal.date).format(DATE_FORMAT)}
           isHistory={!isToday}
           canEdit={canEdit}
@@ -182,7 +184,7 @@ class JournalCard extends React.Component<JournalCardProps, JournalCardState> {
   }
 }
 
-type JournalGridProps = { currentUser?: User, journals: Journal[] }
+type JournalGridProps = { currentUser?: User, journals: Journal[], avatarByUserId: { [userId: string]: Avatar } }
 
 class JournalGrid extends React.Component<JournalGridProps, { currentDate: string }> {
   intervalId: number;
@@ -226,6 +228,11 @@ class JournalGrid extends React.Component<JournalGridProps, { currentDate: strin
     return `${user._id}_${this.state.currentDate}`
   }
 
+  getGravatarUrl(user?: User) {
+    const avatar = user && user._id ? this.props.avatarByUserId[user._id] : undefined
+    return avatar ? avatar.gravatarUrl : 'TODO'
+  }
+
   render() {
     const { currentUser, journals } = this.props
     const currentDate = this.state.currentDate
@@ -234,7 +241,11 @@ class JournalGrid extends React.Component<JournalGridProps, { currentDate: strin
         {currentUser ? (
           this.hasSelf() ? null : (
             <GridCell key={this.idForToday(currentUser)} span={4}>
-              <CreateJournalCard currentUser={currentUser} currentDate={currentDate} onClickWrite={() => this.createNew()} />
+              <CreateJournalCard
+                currentUser={currentUser}
+                avatarUrl={this.getGravatarUrl(currentUser)}
+                currentDate={currentDate}
+                onClickWrite={() => this.createNew()} />
             </GridCell>
           )
         ) : (
@@ -246,6 +257,7 @@ class JournalGrid extends React.Component<JournalGridProps, { currentDate: strin
           <GridCell key={this.idForJournal(journal)} span={4}>
             <JournalCard
               journal={journal}
+              avatarUrl={this.getGravatarUrl(journal.user)}
               isSelf={currentUser ? journal.userId === currentUser._id : false}
               isToday={journal.date === currentDate}
               onClickWrite={() => this.createNew()} />
@@ -271,14 +283,17 @@ const AppToolbar = () => (
 export default class App extends React.Component<{}, {}> {
   render() {
     const JournalGridContainer = withTracker<JournalGridProps, {}>(() => {
+      Meteor.subscribe("avatars", 40)
       const journals = lodash(Journals.find().fetch())
         .filter(journal => journal.user)
         .groupBy(journal => journal.userId)
-        .map((journals, _) => lodash.maxBy(journals, journal => journal.date)!)
+        .map((journals) => lodash.maxBy(journals, journal => journal.date)!)
         .value()
+      const avatarByUserId = _.keyBy(Avatars.find().fetch(), avatar => avatar.userId)
       return {
         currentUser: Meteor.user() as User | undefined,
         journals,
+        avatarByUserId,
       }
     })(JournalGrid)
     return (

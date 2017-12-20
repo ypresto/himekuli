@@ -32,7 +32,7 @@ class JournalCollection extends Mongo.Collection<Journal> {
   }
 }
 
-export const Journals = new JournalCollection('journals', {
+export const Journals = new JournalCollection("journals", {
   transform: (journal: Journal): Journal => {
     journal.user = Meteor.users.findOne(journal.userId) as User | undefined
     return journal as Journal
