@@ -284,17 +284,15 @@ export default class App extends React.Component<{}, {}> {
   render() {
     const JournalGridContainer = withTracker<JournalGridProps, {}>(() => {
       Meteor.subscribe("avatars", 40)
+      const currentUser = Meteor.user() as User | undefined
       const journals = lodash(Journals.find().fetch())
         .filter(journal => journal.user)
         .groupBy(journal => journal.userId)
         .map((journals) => lodash.maxBy(journals, journal => journal.date)!)
+        .sortBy(journal => currentUser && journal.userId === currentUser._id ? -1 : 0, journal => journal.createdAt)
         .value()
       const avatarByUserId = _.keyBy(Avatars.find().fetch(), avatar => avatar.userId)
-      return {
-        currentUser: Meteor.user() as User | undefined,
-        journals,
-        avatarByUserId,
-      }
+      return { currentUser, journals, avatarByUserId }
     })(JournalGrid)
     return (
       <div className="mdc-typography" style={{ color: ORDINAL_TEXT_COLOR }}>
